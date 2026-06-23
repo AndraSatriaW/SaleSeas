@@ -1,0 +1,88 @@
+
+services:
+  # 1. Deals Microservice
+  deals-service:
+    build: ./backend/services/deals-service
+    ports:
+      - "3001:3001"
+    # Env vars can optionally be set here, but it will read the local .env too
+    
+  # 2. Search Microservice
+  search-service:
+    build: ./backend/services/search-service
+    ports:
+      - "3002:3002"
+
+  # 3. API Gateway
+  api-gateway:
+    build: ./backend/api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      # OVERRIDE local environment variables for Docker's internal network
+      - PORT=3000
+      - DEALS_SERVICE_URL=http://deals-service:3001
+      - SEARCH_SERVICE_URL=http://search-service:3002
+      - WISHLIST_SERVICE_URL=http://wishlist-service:3003
+    depends_on:
+      - deals-service
+      - search-service
+      - wishlist-service
+
+  # 4. Vue Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    stdin_open: true
+    tty: true
+    depends_on:
+      - api-gateway
+
+  # 5. Database Service (MariaDB)
+  db:
+    image: mariadb:latest
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpassword
+      MARIADB_DATABASE: saleseas_db
+      MARIADB_USER: saleseas_user
+      MARIADB_PASSWORD: saleseas_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  # 6. phpMyAdmin Service
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: rootpassword
+    depends_on:
+      - db
+
+  # 7. Wishlist Microservice
+  wishlist-service:
+    build: ./backend/services/wishlist-service
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - DB_HOST=db
+      - DB_USER=saleseas_user
+      - DB_PASSWORD=saleseas_password
+      - DB_NAME=saleseas_db
+      - CHEAPSHARK_API_URL=https://www.cheapshark.com/api/1.0
+      - API_GATEWAY_URL=http://api-gateway:3000
+    depends_on:
+      - db
+
+volumes:
+  db_data:
+
